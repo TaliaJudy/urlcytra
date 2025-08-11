@@ -3,7 +3,8 @@ const path = require('path');
 const admin = require('firebase-admin');
 const bodyParser = require('body-parser');
 
-const serviceAccount = require('serviceAccountKey.json);
+// Load Firebase service account
+const serviceAccount = require('./serviceAccountKey.json');
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
@@ -19,7 +20,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Generate random code starting with "cytra"
 function generateCode() {
-  const randomPart = Math.random().toString(36).substring(2, 7); // 5 random chars
+  const randomPart = Math.random().toString(36).substring(2, 7);
   return 'cytra' + randomPart;
 }
 
