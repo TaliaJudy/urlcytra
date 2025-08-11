@@ -4,7 +4,80 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Cytra — URL Shortener</title>
-  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    :root {
+      --bg: #0f1724;
+      --card: #0b1220;
+      --accent: #60a5fa;
+      --muted: #9ca3af;
+      --text: #e6eef8;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, Arial, sans-serif;
+      background: linear-gradient(180deg, #071029 0%, #0b1220 100%);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px;
+    }
+    .card {
+      width: 100%;
+      max-width: 720px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+      border-radius: 12px;
+      padding: 28px;
+      box-shadow: 0 6px 30px rgba(2,6,23,0.6);
+    }
+    h1 { margin: 0 0 6px; font-size: 28px; }
+    p { margin: 0 0 14px; color: var(--muted); }
+    form { display: flex; gap: 8px; }
+    input[type="url"], input[type="text"] {
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.02);
+      color: var(--text);
+      flex: 1;
+    }
+    button {
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: none;
+      background: var(--accent);
+      color: #05203a;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .result {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.02);
+    }
+    .hidden { display: none; }
+    #copyBtn {
+      margin-top: 8px;
+      display: none;
+      background: var(--accent);
+      color: #05203a;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    footer {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    @media(max-width:520px){
+      form { flex-direction: column; }
+    }
+  </style>
 </head>
 <body>
   <main class="card">
@@ -20,7 +93,7 @@
     <div id="result" class="result hidden">
       <p>Short link: <a id="shortLink" href="#" target="_blank"></a></p>
       <p id="stats"></p>
-      <button id="copyBtn">Copy</button>
+      <button id="copyBtn">Copy to Clipboard</button>
     </div>
 
     <footer>
@@ -28,7 +101,76 @@
     </footer>
   </main>
 
-  <!-- app.js is an ES module and uses Firebase Web SDK via CDN -->
-  <script type="module" src="/app.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCyQTC9BMD90v8EOS5ZJOOzLArqifp85Qk",
+      authDomain: "cytra-a9b1d.firebaseapp.com",
+      projectId: "cytra-a9b1d",
+      storageBucket: "cytra-a9b1d.firebasestorage.app",
+      messagingSenderId: "60383087529",
+      appId: "1:60383087529:web:4c4c792eba06a10f4412b8",
+      measurementId: "G-LGJ250744Y"
+    };
+
+    const appFB = initializeApp(firebaseConfig);
+    const db = getFirestore(appFB);
+
+    const form = document.getElementById('shortenForm');
+    const urlInput = document.getElementById('url');
+    const customInput = document.getElementById('custom');
+    const resultBox = document.getElementById('result');
+    const shortLink = document.getElementById('shortLink');
+    const stats = document.getElementById('stats');
+    const copyBtn = document.getElementById('copyBtn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const url = urlInput.value.trim();
+      const custom = customInput.value.trim() || undefined;
+
+      try {
+        const res = await fetch('/api/shorten', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, custom })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || 'Error creating short link');
+          return;
+        }
+
+        shortLink.href = data.short;
+        shortLink.textContent = data.short;
+        resultBox.classList.remove('hidden');
+
+        // Show and handle copy button
+        copyBtn.style.display = 'inline-block';
+        copyBtn.textContent = 'Copy to Clipboard';
+        copyBtn.onclick = () => {
+          navigator.clipboard.writeText(data.short).then(() => {
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => (copyBtn.textContent = 'Copy to Clipboard'), 1500);
+          });
+        };
+
+        // Real-time stats from Firestore
+        const statsRef = doc(db, "urls", data.code);
+        onSnapshot(statsRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const d = docSnap.data();
+            stats.textContent = `Original: ${d.url} · Hits: ${d.hits}`;
+          }
+        });
+
+      } catch (err) {
+        console.error(err);
+        alert('Network error');
+      }
+    });
+  </script>
 </body>
 </html>
