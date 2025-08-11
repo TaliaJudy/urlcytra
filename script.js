@@ -60,6 +60,6 @@ form.addEventListener('submit', async (e) => {
 
   } catch (err) {
     console.error(err);
-    alert('Network error');
+    alert('Network error — make sure the backend is running');
   }
 });
