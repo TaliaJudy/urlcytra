@@ -1,70 +1,79 @@
-// public/app.js (ES module)
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+const express = require('express');
+const path = require('path');
+const admin = require('firebase-admin');
+const bodyParser = require('body-parser');
 
-// Your Firebase config (the web config you provided)
-const firebaseConfig = {
-  apiKey: "AIzaSyCyQTC9BMD90v8EOS5ZJOOzLArqifp85Qk",
-  authDomain: "cytra-a9b1d.firebaseapp.com",
-  projectId: "cytra-a9b1d",
-  storageBucket: "cytra-a9b1d.firebasestorage.app",
-  messagingSenderId: "60383087529",
-  appId: "1:60383087529:web:4c4c792eba06a10f4412b8",
-  measurementId: "G-LGJ250744Y"
-};
+const serviceAccount = require('./cytra-a9b1d-firebase-adminsdk-fbsvc-82c76daa51.json');
 
-// Init Firebase
-const appFB = initializeApp(firebaseConfig);
-const db = getFirestore(appFB);
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
 
-const form = document.getElementById('shortenForm');
-const urlInput = document.getElementById('url');
-const customInput = document.getElementById('custom');
-const resultBox = document.getElementById('result');
-const shortLink = document.getElementById('shortLink');
-const stats = document.getElementById('stats');
-const copyBtn = document.getElementById('copyBtn');
+const db = admin.firestore();
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const url = urlInput.value.trim();
-  const custom = customInput.value.trim() || undefined;
+// Middleware
+app.use(bodyParser.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Generate random code starting with "cytra"
+function generateCode() {
+  const randomPart = Math.random().toString(36).substring(2, 7); // 5 random chars
+  return 'cytra' + randomPart;
+}
+
+// API route to shorten URL
+app.post('/api/shorten', async (req, res) => {
+  const { url } = req.body;
+  if (!url) {
+    return res.status(400).json({ error: 'URL is required' });
+  }
+
+  const code = generateCode();
 
   try {
-    const res = await fetch('/api/shorten', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, custom })
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      alert(data.error || 'Error creating short link');
-      return;
-    }
-
-    shortLink.href = data.short;
-    shortLink.textContent = data.short;
-    resultBox.classList.remove('hidden');
-
-    // Real-time stats from Firestore
-    const statsRef = doc(db, "urls", data.code);
-    onSnapshot(statsRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const d = docSnap.data();
-        stats.textContent = `Original: ${d.url} · Hits: ${d.hits}`;
-      }
+    await db.collection('urls').doc(code).set({
+      url,
+      code,
+      hits: 0,
+      createdAt: new Date()
     });
 
+    res.json({
+      short: `${req.protocol}://${req.get('host')}/${code}`,
+      code
+    });
   } catch (err) {
     console.error(err);
-    alert('Network error');
+    res.status(500).json({ error: 'Error creating short link' });
   }
 });
 
-copyBtn.addEventListener('click', () => {
-  const link = shortLink.href;
-  navigator.clipboard.writeText(link).then(() => {
-    copyBtn.textContent = 'Copied!';
-    setTimeout(() => (copyBtn.textContent = 'Copy'), 1400);
-  });
+// Redirect short code to original URL
+app.get('/:code', async (req, res) => {
+  const code = req.params.code;
+
+  try {
+    const docSnap = await db.collection('urls').doc(code).get();
+
+    if (!docSnap.exists) {
+      return res.status(404).send('Short link not found');
+    }
+
+    const data = docSnap.data();
+    await db.collection('urls').doc(code).update({
+      hits: (data.hits || 0) + 1
+    });
+
+    res.redirect(data.url);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Error redirecting');
+  }
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`Cytra Shortener running on port ${PORT}`);
 });
