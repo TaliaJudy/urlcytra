@@ -3,7 +3,7 @@ const path = require('path');
 const admin = require('firebase-admin');
 const bodyParser = require('body-parser');
 
-const serviceAccount = require('./cytra-a9b1d-firebase-adminsdk-fbsvc-82c76daa51.json');
+const serviceAccount = require('./serviceAccountKey.json);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
