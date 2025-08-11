@@ -5,10 +5,17 @@ import admin from 'firebase-admin';
 import fs from 'fs';
 
 // Load Firebase service account JSON
-const serviceAccount = JSON.parse(fs.readFileSync('./serviceAccountKey.json', 'utf8'));
+let serviceAccount;
+if (process.env.SERVICE_ACCOUNT_KEY) {
+  // Online deployment (Render/Railway) - from env var
+  serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_KEY);
+} else {
+  // Local Termux use - from file
+  serviceAccount = JSON.parse(fs.readFileSync('./serviceAccountKey.json', 'utf8'));
+}
 
 const app = express();
-app.use(cors()); // Allow all origins
+app.use(cors());
 app.use(bodyParser.json());
 
 // Firebase setup
@@ -25,7 +32,7 @@ app.post('/api/shorten', async (req, res) => {
   }
 
   const randomCode = Math.random().toString(36).substring(2, 7); // 5 chars
-  const code = "cytra" + (custom && custom.trim() !== "" ? custom : randomCode);
+  const code = custom && custom.trim() !== "" ? custom : randomCode;
 
   try {
     await db.collection('urls').doc(code).set({
@@ -35,9 +42,10 @@ app.post('/api/shorten', async (req, res) => {
       createdAt: new Date()
     });
 
-    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
-    res.json({ short: `${baseUrl}/${code}`, code });
+    const baseUrl =
+      process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
 
+    res.json({ short: `${baseUrl}/${code}`, code });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error creating short link' });
@@ -58,5 +66,5 @@ app.get('/:code', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running at http://0.0.0.0:${PORT}`);
+  console.log(`✅ Server running at http://0.0.0.0:${PORT}`);
 });
