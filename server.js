@@ -2,12 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import admin from 'firebase-admin';
-import serviceAccount from './serviceAccountKey.json' assert { type: "json" };
+import fs from 'fs';
+
+// Load Firebase service account JSON
+const serviceAccount = JSON.parse(fs.readFileSync('./serviceAccountKey.json', 'utf8'));
 
 const app = express();
-
-// Enable CORS for all origins (you can restrict this later)
-app.use(cors());
+app.use(cors()); // Allow all origins
 app.use(bodyParser.json());
 
 // Firebase setup
@@ -43,11 +44,12 @@ app.post('/api/shorten', async (req, res) => {
   }
 });
 
+// Redirect endpoint
 app.get('/:code', async (req, res) => {
   const { code } = req.params;
   const docSnap = await db.collection('urls').doc(code).get();
   if (!docSnap.exists) {
-    return res.status(404).sendFile(process.cwd() + '/views/info.ejs');
+    return res.status(404).send('Not found');
   }
   const data = docSnap.data();
   await db.collection('urls').doc(code).update({ hits: data.hits + 1 });
@@ -55,4 +57,6 @@ app.get('/:code', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running at http://0.0.0.0:${PORT}`);
+});
