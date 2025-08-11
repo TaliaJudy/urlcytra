@@ -14,6 +14,11 @@ const firebaseConfig = {
 const appFB = initializeApp(firebaseConfig);
 const db = getFirestore(appFB);
 
+// Change this to your backend's deployed URL
+const API_BASE = window.location.hostname.includes("localhost")
+  ? "http://localhost:3000"
+  : "https://urlcytra.onrender.com";
+
 const form = document.getElementById('shortenForm');
 const urlInput = document.getElementById('url');
 const resultBox = document.getElementById('result');
@@ -26,12 +31,14 @@ form.addEventListener('submit', async (e) => {
   const url = urlInput.value.trim();
 
   try {
-    const res = await fetch('/api/shorten', {
+    const res = await fetch(`${API_BASE}/api/shorten`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url })
     });
+
     const data = await res.json();
+
     if (!res.ok) {
       alert(data.error || 'Error creating short link');
       return;
@@ -60,6 +67,6 @@ form.addEventListener('submit', async (e) => {
 
   } catch (err) {
     console.error(err);
-    alert('Network error — make sure the backend is running');
+    alert('Network error — could not connect to backend.');
   }
 });
